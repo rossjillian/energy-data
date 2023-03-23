@@ -19,16 +19,7 @@ def main():
     print(command)
 
 
-def get_processes():
-    ps_call = subprocess.run('nvidia-smi', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if ps_call.returncode != 0:
-        print('nvidia-smi exited with error code {}:'.format(ps_call.returncode))
-        print(ps_call.stdout.decode() + ps_call.stderr.decode())
-        sys.exit()
-    lines_proc = ps_call.stdout.decode().split("\n")
-    lines = [line + '\n' for line in lines_proc[:-1]]
-    lines += lines_proc[-1]
-
+def get_pids(lines):
     is_new_format = False
     # Copy the utilization upper part verbatim
     for i in range(len(lines)):
@@ -57,6 +48,20 @@ def get_processes():
         pid.append(line[pid_idx])
         gpu_mem.append(line[gpu_mem_idx])
         i += 1
+    return pid, gpu_num, gpu_mem
+
+
+def get_processes():
+    ps_call = subprocess.run('nvidia-smi', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if ps_call.returncode != 0:
+        print('nvidia-smi exited with error code {}:'.format(ps_call.returncode))
+        print(ps_call.stdout.decode() + ps_call.stderr.decode())
+        sys.exit()
+    lines_proc = ps_call.stdout.decode().split("\n")
+    lines = [line + '\n' for line in lines_proc[:-1]]
+    lines += lines_proc[-1]
+
+    pid, gpu_num, gpu_mem = get_pids(lines)
 
     # Query the PIDs using ps
     ps_format = "pid,user,%cpu,%mem,etime,command"
