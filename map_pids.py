@@ -1,4 +1,5 @@
 import re
+import sys
 import subprocess
 
 
@@ -19,7 +20,43 @@ def main():
 
 
 def get_processes():
-    pid = []
+    ps_call = subprocess.run('nvidia-smi', stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if ps_call.returncode != 0:
+        print('nvidia-smi exited with error code {}:'.format(ps_call.returncode))
+        print(ps_call.stdout.decode() + ps_call.stderr.decode())
+        sys.exit()
+    lines_proc = ps_call.stdout.decode().split("\n")
+    lines = [line + '\n' for line in lines_proc[:-1]]
+    lines += lines_proc[-1]
+
+    is_new_format = False
+    # Copy the utilization upper part verbatim
+    for i in range(len(lines)):
+        if not lines[i].startswith("| Processes:"):
+            pass
+        else:
+            while not lines[i].startswith("|===="):
+                m = re.search(r'GPU\s*GI\s*CI', lines[i])
+                if m is not None:
+                    is_new_format = True
+                i += 1
+            i += 1
+            break
+
+    gpu_num_idx = 1
+    pid_idx = 2 if not is_new_format else 4
+    gpu_mem_idx = -3
+    pid, gpu_num, gpu_mem = [], [], []
+    while not lines[i].startswith("+--"):
+        if "Not Supported" in lines[i]:
+            i += 1
+            continue
+        line = lines[i]
+        line = re.split(r'\s+', line)
+        gpu_num.append(line[gpu_num_idx])
+        pid.append(line[pid_idx])
+        gpu_mem.append(line[gpu_mem_idx])
+        i += 1
 
     # Query the PIDs using ps
     ps_format = "pid,user,%cpu,%mem,etime,command"
